@@ -1,0 +1,11 @@
+add
+sub
+mul
+imul
+div
+idiv
+shl
+shr
+mov
+ret
+call
