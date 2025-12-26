@@ -1,7 +1,6 @@
 use super::hash::{FOHash, Hashable, SOHash, HashKey, MXF64};
 use regex::Regex;
 use std::{path::PathBuf, str::FromStr};
-use std::io::Write;
 
 // https://cmph.sourceforge.net/papers/esa09.pdf
 
@@ -153,6 +152,7 @@ impl PHash {
             let item = Item::new(ItemType::Str(s.to_string()), &phash.fo_hash);
             let item_key = (item.key() % n as u32) as usize;
 
+            // TODO: remove, can hurt performance
             if phash.buckets[item_key].items.iter().find(|x| x.data == item.data).is_some() {
                 println!("Found duplicate: {}, removing it", item.data.to_string());
                 m -= 1;
@@ -229,13 +229,15 @@ impl PHash {
             }
 
             done += 1;
-            print!(
-                "\rProgress: {}/{} ({:.1}%)   ",
-                done,
-                total,
-                (done as f64 / total as f64) * 100.0
-            );
-            std::io::stdout().flush().unwrap();
+
+            if done % (total / 1000) == 0 || done == total {
+                print!(
+                    "\rProgress: {}/{} ({:.1}%)   ",
+                    done,
+                    total,
+                    (done as f64 / total as f64) * 100.0
+                );
+            }
         }
 
         println!("");

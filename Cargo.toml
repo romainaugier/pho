@@ -9,6 +9,10 @@ opt-level = 0
 
 [profile.release]
 opt-level = 3
+# For flamegraph
+debug = true
+lto = false
+codegen-units = 1
 
 [dependencies]
 clap = { version = "4.5.53", features = ["derive"] }
