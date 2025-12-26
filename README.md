@@ -1,6 +1,6 @@
 # pho
 
-Perfect Hash Oracle is a cli tool that generates perfect hash-tables for any given dataset, in many languages.
+pho (Perfect Hash Oracle) is a cli tool that generates perfect hash-tables for any given dataset, in many languages.
 
 ## Usage
 
