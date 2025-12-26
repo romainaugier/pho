@@ -7,15 +7,15 @@ Perfect Hash Oracle is a cli tool that generates perfect hash-tables for any giv
 Usage: `pho [OPTIONS] --file <FILE> --name <NAME>`
 
 Options:
-  -f, --file <FILE>                            
-  -k, --key-type <KEY_TYPE>                    [default: string]
-  -o, --output <OUTPUT>                        [default: pho_output.c]
-  -n, --name <NAME>                            
-      --namespace <NAMESPACE>                  [default: pho]
-      --first-order-hash <FIRST_ORDER_HASH>    [default: murmur3]
-      --second-order-hash <SECOND_ORDER_HASH>  [default: xorshift]
-  -h, --help                                   Print help
-  -V, --version                                Print version
+  - -f, --file <FILE>                            
+  - -k, --key-type <KEY_TYPE>                [default: string]
+  - -o, --output <OUTPUT>                    [default: pho_output.c]
+  - -n, --name <NAME>                            
+  - --namespace <NAMESPACE>                  [default: pho]
+  - --first-order-hash <FIRST_ORDER_HASH>    [default: murmur3]
+  - --second-order-hash <SECOND_ORDER_HASH>  [default: xorshift]
+  - -h, --help                               Print help
+  - -V, --version                            Print version
 
 ## Features
 
