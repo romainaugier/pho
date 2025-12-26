@@ -1,6 +1,7 @@
 use super::hash::{FOHash, Hashable, SOHash, HashKey, MXF64};
 use regex::Regex;
 use std::{path::PathBuf, str::FromStr};
+use std::cmp::max;
 
 // https://cmph.sourceforge.net/papers/esa09.pdf
 
@@ -138,7 +139,7 @@ impl PHash {
         }
 
         // We use m / 2 as the number of buckets. Could be changed to m / 4
-        let n = m / 2;
+        let n = ((m as f64) * 0.1) as usize;
 
         println!("Using {n} buckets");
 
@@ -230,7 +231,7 @@ impl PHash {
 
             done += 1;
 
-            if done % (total / 1000) == 0 || done == total {
+            if done == total || done % max(1, total.strict_div_euclid(1000)) == 0 {
                 print!(
                     "\rProgress: {}/{} ({:.1}%)   ",
                     done,

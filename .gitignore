@@ -2,3 +2,6 @@
 
 pho_output.*
 pho_test.*
+
+*.svg
+perf*
