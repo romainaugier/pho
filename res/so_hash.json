@@ -12,6 +12,18 @@
         "typedefs": null
       }
     },
+    "mxf64": {
+      "c": {
+        "body": "unsigned long long {name}(unsigned long long key, unsigned long long seed)\n{{\n    unsigned long long h = key * (seed | 1);\n    h ^= h >> 33;\n    h *= 0xff51afd7ed558ccd;\n    h ^= h >> 33;\n    return h;\n}}\n",
+        "imports": null,
+        "typedefs": null
+      },
+      "py": {
+        "body": "def {name}(key: int, seed: int) -> int:\n    h = (key & 0xFFFFFFFF) * ((seed & 0xFFFFFFFF) | 1)\n    h &= 0xFFFFFFFFFFFFFFFF\n    h ^= h >> 33\n    h *= 0xff51afd7ed558ccd\n    h &= 0xFFFFFFFFFFFFFFFF\n    h ^= h >> 33\n    return h & 0xFFFFFFFF\n",
+        "imports": null,
+        "typedefs": null
+      }
+    },
     "xorshift": {
       "c": {
         "body": "unsigned int {name}(unsigned int key, unsigned int seed)\n{{\n    unsigned int h = key * (seed | 1);\n    h = (h ^ 61) ^ (h >> 16);\n    h = h * 9;\n    h = h ^ (h >> 4);\n    h = h * 0x27d4eb2d;\n    h = h ^ (h >> 15);\n    h ^= (1 + h) << 13;\n    h ^= h >> 17;\n    h ^= h << 5;\n    return h;\n}}\n",

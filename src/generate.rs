@@ -12,6 +12,7 @@ pub fn gen_code(
     phash: &PHash,
     name: &str,
     namespace: &str,
+    add_test_code: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let ext = output_path
         .extension()
@@ -48,9 +49,29 @@ pub fn gen_code(
         .first_item()
         .unwrap_or_else(|| panic!("Cannot find any item"));
 
-    output_lang
-        .get_imports_from_type(first_item.item_type())
-        .and_then(|imports| write!(output_buffer, "{}\n", imports).ok());
+    let first_bucket = phash
+        .first_bucket()
+        .unwrap_or_else(|| panic!("Cannot find any bucket"));
+
+    let mut imports = Vec::new();
+
+    if let Some(imps) = output_lang.get_imports_from_type(first_item.item_type()) {
+        imports.extend(imps.lines().map(String::from));
+    }
+
+    if add_test_code {
+        if let Some(imps) = output_lang.get_imports_for_test(first_item.item_type()) {
+            imports.extend(imps.lines().map(String::from));
+        }
+    }
+
+    for import in imports.iter() {
+        write!(output_buffer, "{}\n", import)?;
+    }
+
+    if imports.len() > 0 {
+        write!(output_buffer, "\n")?;
+    }
 
     // First-order hash function
 
@@ -90,7 +111,9 @@ pub fn gen_code(
     vars.insert("name".to_string(), so_seeds_name.clone());
     vars.insert(
         "type".to_string(),
-        output_lang.map_type::<u32>(&0).to_string(),
+        output_lang
+            .map_seed(&first_bucket.so_hash().seed())
+            .to_string(),
     );
     vars.insert("size".to_string(), format!("{}", phash.buckets().len()));
 
@@ -165,6 +188,12 @@ pub fn gen_code(
     vars.insert(
         "type".to_string(),
         output_lang.get_type(first_item.item_type()).to_string(),
+    );
+    vars.insert(
+        "key_type".to_string(),
+        output_lang
+            .map_seed(&first_bucket.so_hash().seed())
+            .to_string(),
     );
     vars.insert("fo_function_name".to_string(), fo_function_name);
     vars.insert("so_function_name".to_string(), so_function_name);

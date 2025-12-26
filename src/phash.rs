@@ -1,4 +1,4 @@
-use super::hash::{FOHash, Hashable, SOHash};
+use super::hash::{FOHash, Hashable, SOHash, HashKey, MXF64};
 use regex::Regex;
 use std::{path::PathBuf, str::FromStr};
 use std::io::Write;
@@ -47,14 +47,14 @@ impl ItemType {
 #[derive(Debug, Default, Clone)]
 pub struct Item {
     data: ItemType,
-    foh: u32,
+    key: HashKey,
     final_pos: u32,
 }
 
 impl Item {
     pub fn new(item_type: ItemType, hasher: &FOHash) -> Item {
         return Item {
-            foh: hasher.hash(&item_type.hashable()),
+            key: hasher.hash(&item_type.hashable()),
             data: item_type,
             final_pos: 0,
         };
@@ -64,8 +64,8 @@ impl Item {
         return &self.data;
     }
 
-    pub fn key(&self) -> u32 {
-        return self.foh;
+    pub fn key(&self) -> HashKey {
+        return self.key;
     }
 }
 
@@ -105,7 +105,13 @@ impl PHash {
         let mut phash = PHash::default();
 
         phash.fo_hash = FOHash::from_str(first_order_hash)?;
+
         phash.so_hash = SOHash::from_str(second_order_hash)?;
+
+        if phash.fo_hash().is_64bits() && !phash.so_hash().is_64bits() {
+            println!("Second-order hash {} is not 64-bits, switching to mxf64", phash.so_hash().name());
+            phash.so_hash = SOHash::MXF64(MXF64::default());
+        }
 
         return Ok(phash);
     }
@@ -119,8 +125,8 @@ impl PHash {
 
         let mut phash = PHash::new(first_order_hash, second_order_hash)?;
 
-        println!("First-order hash: {first_order_hash}");
-        println!("Second-order hash: {second_order_hash}");
+        println!("First-order hash: {}", phash.fo_hash().name());
+        println!("Second-order hash: {}", phash.so_hash().name());
 
         let file_content = std::fs::read_to_string(file_path).expect("Unable to read file");
 
@@ -185,14 +191,17 @@ impl PHash {
 
             // println!("{:?}", bucket.items);
 
+            let mut candidate_pos: Vec<u32> = Vec::new();
+
             while collision {
-                let seed = rand::random::<u32>();
-
-                bucket.so_hash.set_seed(seed);
-
-                let mut candidate_pos: Vec<u32> = Vec::new();
+                if bucket.so_hash.is_64bits() {
+                    bucket.so_hash.set_seed(rand::random::<u64>().into());
+                } else {
+                    bucket.so_hash.set_seed(rand::random::<u32>().into());
+                }
 
                 collision = false;
+                candidate_pos.clear();
 
                 for item in bucket.items.iter_mut() {
                     let pos = bucket.so_hash.hash(item.key()) % m as u32;
@@ -213,8 +222,8 @@ impl PHash {
                 }
 
                 if !collision {
-                    for pos in candidate_pos {
-                        occupied[pos as usize] = true;
+                    for pos in candidate_pos.iter() {
+                        occupied[*pos as usize] = true;
                     }
                 }
             }
@@ -243,11 +252,15 @@ impl PHash {
     }
 
     pub fn so_hash(&self) -> &SOHash {
-        return &self.buckets[0].so_hash;
+        return &self.so_hash;
     }
 
     pub fn buckets(&self) -> &Buckets {
         return &self.buckets;
+    }
+
+    pub fn first_bucket(&self) -> Option<&Bucket> {
+        return self.buckets.first();
     }
 
     pub fn first_item(&self) -> Option<&Item> {

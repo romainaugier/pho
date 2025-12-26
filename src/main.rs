@@ -31,6 +31,9 @@ struct Args {
 
     #[arg(long, default_value = "xorshift")]
     second_order_hash: String,
+
+    #[arg(long, short, default_value_t = false)]
+    test: bool,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -42,7 +45,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let start = Instant::now();
 
-    let phash = PHash::from_file(&args.file, &args.first_order_hash, &args.second_order_hash)?;
+    let phash = PHash::from_file(
+        &args.file,
+        &args.first_order_hash,
+        &args.second_order_hash,
+    )?;
 
     let elapsed = start.elapsed();
     let ms = elapsed.as_millis();
@@ -54,5 +61,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &phash,
         args.name.as_str(),
         args.namespace.as_str(),
+        args.test,
     );
 }
