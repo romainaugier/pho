@@ -1,8 +1,11 @@
-use std::path::PathBuf;
+use super::hash::{FOHash, Hashable, SOHash};
 use regex::Regex;
-use super::hash::{FOHash,SOHash,Hashable};
+use std::{path::PathBuf, str::FromStr};
+use std::io::Write;
 
-#[derive(Debug, Clone)]
+// https://cmph.sourceforge.net/papers/esa09.pdf
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ItemType {
     Str(String),
     I64(i64),
@@ -17,6 +20,18 @@ impl Default for ItemType {
     }
 }
 
+impl ToString for ItemType {
+    fn to_string(&self) -> String {
+        match self {
+            ItemType::Str(s) => format!("\"{}\"", s),
+            ItemType::I64(i64) => i64.to_string(),
+            ItemType::I32(i32) => i32.to_string(),
+            ItemType::U64(u64) => u64.to_string(),
+            ItemType::U32(u32) => u32.to_string(),
+        }
+    }
+}
+
 impl ItemType {
     pub fn hashable(&self) -> Hashable {
         match self {
@@ -25,15 +40,15 @@ impl ItemType {
             ItemType::I32(i32) => i32.to_le_bytes().to_vec(),
             ItemType::U64(u64) => u64.to_le_bytes().to_vec(),
             ItemType::U32(u32) => u32.to_le_bytes().to_vec(),
-            _ => Hashable::default(),
         }
     }
 }
 
 #[derive(Debug, Default, Clone)]
-struct Item {
+pub struct Item {
     data: ItemType,
     foh: u32,
+    final_pos: u32,
 }
 
 impl Item {
@@ -41,7 +56,12 @@ impl Item {
         return Item {
             foh: hasher.hash(&item_type.hashable()),
             data: item_type,
-        }
+            final_pos: 0,
+        };
+    }
+
+    pub fn item_type(&self) -> &ItemType {
+        return &self.data;
     }
 
     pub fn key(&self) -> u32 {
@@ -55,38 +75,202 @@ pub struct Bucket {
     so_hash: SOHash,
 }
 
+impl Bucket {
+    pub fn new(so_hash: SOHash) -> Bucket {
+        let mut bucket = Bucket::default();
+        bucket.so_hash = so_hash;
+
+        return bucket;
+    }
+    pub fn so_hash(&self) -> &SOHash {
+        return &self.so_hash;
+    }
+}
+
 type Buckets = Vec<Bucket>;
 
 #[derive(Debug, Default)]
 pub struct PHash {
     buckets: Buckets,
     fo_hash: FOHash,
+    so_hash: SOHash,
+    m: usize,
 }
 
 impl PHash {
-    pub fn from_file(file_path: &PathBuf) -> Result<PHash, Box<dyn std::error::Error>> {
-        let fo_hasher = FOHash::default();
-
+    fn new(
+        first_order_hash: &str,
+        second_order_hash: &str,
+    ) -> Result<PHash, Box<dyn std::error::Error>> {
         let mut phash = PHash::default();
+
+        phash.fo_hash = FOHash::from_str(first_order_hash)?;
+        phash.so_hash = SOHash::from_str(second_order_hash)?;
+
+        return Ok(phash);
+    }
+
+    pub fn from_file(
+        file_path: &PathBuf,
+        first_order_hash: &str,
+        second_order_hash: &str,
+    ) -> Result<PHash, Box<dyn std::error::Error>> {
+        println!("Generating perfect hash for file: \"{}\"", file_path.display());
+
+        let mut phash = PHash::new(first_order_hash, second_order_hash)?;
+
+        println!("First-order hash: {first_order_hash}");
+        println!("Second-order hash: {second_order_hash}");
 
         let file_content = std::fs::read_to_string(file_path).expect("Unable to read file");
 
         let sep = Regex::new(r"([\n,]+)").expect("Invalid regex");
 
-        // We use n / 2 as the number of buckets. Could be changed to n / 4
-        let n = (sep.find_iter(file_content.as_str()).size_hint().1.unwrap_or(10) / 2) as u32;
+        let mut m = 0;
 
-        phash.buckets.resize(n as usize, Bucket::default());
-        phash.fo_hash = FOHash::default();
-
-        for s in sep.split(file_content.as_str()).into_iter() {
-            let item = Item::new(ItemType::Str(s.to_string()), &phash.fo_hash);
-
-            phash.buckets[(item.key() % n) as usize].items.push(item);
+        for _ in sep.find_iter(file_content.as_str()) {
+            m += 1;
         }
 
-        println!("{:?}", phash);
+        // We use m / 2 as the number of buckets. Could be changed to m / 4
+        let n = m / 2;
+
+        println!("Using {n} buckets");
+
+        phash.buckets = vec![Bucket::new(phash.so_hash.clone()); n];
+
+        for s in sep.split(file_content.as_str()).into_iter() {
+            if s.len() == 0 {
+                continue;
+            }
+
+            let item = Item::new(ItemType::Str(s.to_string()), &phash.fo_hash);
+            let item_key = (item.key() % n as u32) as usize;
+
+            if phash.buckets[item_key].items.iter().find(|x| x.data == item.data).is_some() {
+                println!("Found duplicate: {}, removing it", item.data.to_string());
+                m -= 1;
+                continue;
+            }
+
+            if let Some(found) = phash.buckets[item_key].items.iter().find(|x| x.key() == item.key()) {
+                println!("Found collision: {} / {} (key: {}), aborting",
+                         item.data.to_string(),
+                         found.data.to_string(),
+                         item.key());
+                m -= 1;
+                continue;
+            }
+
+            phash.buckets[item_key].items.push(item);
+        }
+
+        println!("Found {m} items to process for the perfect hash table");
+        phash.m = m;
+
+        let mut sorted_buckets: Vec<&mut Bucket> = Vec::new();
+        sorted_buckets.extend(&mut phash.buckets);
+        sorted_buckets.sort_by_key(|item| std::cmp::Reverse(item.items.len()));
+
+        let mut occupied = vec![false; m as usize];
+        let total = sorted_buckets.iter().filter(|b| !b.items.is_empty()).count();
+        let mut done = 0;
+
+        for bucket in sorted_buckets.iter_mut() {
+            if bucket.items.len() == 0 {
+                continue;
+            }
+
+            let mut collision = true;
+
+            // println!("{:?}", bucket.items);
+
+            while collision {
+                let seed = rand::random::<u32>();
+
+                bucket.so_hash.set_seed(seed);
+
+                let mut candidate_pos: Vec<u32> = Vec::new();
+
+                collision = false;
+
+                for item in bucket.items.iter_mut() {
+                    let pos = bucket.so_hash.hash(item.key()) % m as u32;
+
+                    if occupied[pos as usize] {
+                        collision = true;
+                        break;
+                    }
+
+                    if candidate_pos.iter().find(|&x| *x == pos).is_some() {
+                        collision = true;
+                        break;
+                    }
+
+                    candidate_pos.push(pos);
+
+                    item.final_pos = pos;
+                }
+
+                if !collision {
+                    for pos in candidate_pos {
+                        occupied[pos as usize] = true;
+                    }
+                }
+            }
+
+            done += 1;
+            print!(
+                "\rProgress: {}/{} ({:.1}%)   ",
+                done,
+                total,
+                (done as f64 / total as f64) * 100.0
+            );
+            std::io::stdout().flush().unwrap();
+        }
+
+        println!("");
 
         return Ok(phash);
+    }
+
+    pub fn m(&self) -> usize {
+        return self.m;
+    }
+
+    pub fn fo_hash(&self) -> &FOHash {
+        return &self.fo_hash;
+    }
+
+    pub fn so_hash(&self) -> &SOHash {
+        return &self.buckets[0].so_hash;
+    }
+
+    pub fn buckets(&self) -> &Buckets {
+        return &self.buckets;
+    }
+
+    pub fn first_item(&self) -> Option<&Item> {
+        for bucket in self.buckets.iter() {
+            if bucket.items.is_empty() {
+                continue;
+            }
+
+            return bucket.items.first();
+        }
+
+        return None;
+    }
+
+    pub fn items(&self) -> Vec<&Item> {
+        let mut result = vec![None; self.m];
+
+        for bucket in self.buckets.iter() {
+            for item in bucket.items.iter() {
+                result[item.final_pos as usize] = Some(item);
+            }
+        }
+
+        return result.into_iter().flatten().collect();
     }
 }

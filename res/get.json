@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "c": {
+      "body": "const {type} {name}(const {type} key)\n{{\n    const unsigned int fo_key = {fo_function_name}({key_address}key, {key_size});\n    const unsigned int so_key = {so_function_name}(fo_key, {so_seeds_name}[fo_key % {num_seeds}]);\n    return {values_name}[so_key % {m}];\n}}\n"
+    },
+    "py": {
+      "body": "def {name}(key: {type}) -> {type}:\n    fo_key = {fo_function_name}({key_conversion_start}key{key_conversion_end})\n    so_key = {so_function_name}(fo_key, {so_seeds_name}[fo_key % {num_seeds}])\n    return {values_name}[so_key % {m}]\n"
+    }
+  }
+}

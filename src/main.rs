@@ -1,9 +1,12 @@
-use std::path::PathBuf;
-
 use clap::Parser;
+use phash::PHash;
+use std::path::PathBuf;
+use std::time::Instant;
 
-pub mod phash;
+pub mod generate;
 pub mod hash;
+pub mod lang;
+pub mod phash;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -11,30 +14,45 @@ struct Args {
     #[arg(short, long)]
     file: PathBuf,
 
-    #[arg(short, long, default_value = "c")]
-    lang: String,
-
-    #[arg(long, default_value = "info")]
-    log_level: String,
+    #[arg(short, long, default_value = "string")]
+    key_type: String,
 
     #[arg(short, long, default_value = "pho_output.c")]
-    output: String,
+    output: PathBuf,
+
+    #[arg(short, long)]
+    name: String,
+
+    #[arg(long, default_value = "pho")]
+    namespace: String,
+
+    #[arg(long, default_value = "murmur3")]
+    first_order_hash: String,
+
+    #[arg(long, default_value = "xorshift")]
+    second_order_hash: String,
 }
 
-// https://cmph.sourceforge.net/papers/esa09.pdf
-
-fn main() -> Result<(), Box<dyn std::error::Error>>{
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
     if !args.file.exists() {
         return Err(format!("Cannot find file {}", args.file.display()).into());
     }
 
-    let log_level = args.log_level.trim().parse()?;
+    let start = Instant::now();
 
-    spdlog::default_logger().set_level_filter(spdlog::LevelFilter::Equal(log_level));
+    let phash = PHash::from_file(&args.file, &args.first_order_hash, &args.second_order_hash)?;
 
-    let phash = phash::PHash::from_file(&args.file)?;
+    let elapsed = start.elapsed();
+    let ms = elapsed.as_millis();
 
-    return Ok(());
+    println!("Perfect Hash found in {} ms", ms);
+
+    return generate::gen_code(
+        args.output,
+        &phash,
+        args.name.as_str(),
+        args.namespace.as_str(),
+    );
 }

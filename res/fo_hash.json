@@ -1,0 +1,40 @@
+{
+  "functions": {
+    "fnv1a": {
+      "c": {
+        "body": "unsigned int {name}(const void* data, unsigned int sz)\n{{\n    const char* cdata = (const char*)data;\n    unsigned int res = 0x811c9dc5;\n    unsigned int i = 0;\n\n    while(i < sz)\n    {{\n        res ^= cdata[i++];\n        res *= 0x01000193;\n    }}\n\n    return res;\n}}\n",
+        "imports": null,
+        "typedefs": null
+      },
+      "py": {
+        "body": "def {name}(data: bytes) -> int:\n    res = 0x811c9dc5\n    prime = 0x01000193\n    \n    for byte in data:\n        res ^= byte\n        res *= prime\n        res &= 0xFFFFFFFF\n    \n    return res\n",
+        "imports": null,
+        "typedefs": null
+      }
+    },
+    "xxhash32": {
+      "c": {
+        "body": "unsigned int {name}(const void* data, unsigned int sz)\n{{\n    const unsigned char* cdata = (const unsigned char*)data;\n    const unsigned int PRIME1 = 0x9E3779B1;\n    const unsigned int PRIME2 = 0x85EBCA6B;\n    const unsigned int PRIME3 = 0xC2B2AE35;\n    const unsigned int PRIME4 = 0x27D4EB2F;\n    const unsigned int PRIME5 = 0x165667B1;\n    unsigned int res = PRIME5 + sz;\n    unsigned int i = 0;\n    \n    while(i + 4 <= sz)\n    {{\n        unsigned int k = ((unsigned int)cdata[i]) | \n                        ((unsigned int)cdata[i+1] << 8) | \n                        ((unsigned int)cdata[i+2] << 16) | \n                        ((unsigned int)cdata[i+3] << 24);\n        res += k * PRIME1;\n        res = ((res << 13) | (res >> 19)) * PRIME2;\n        i += 4;\n    }}\n    \n    if(i < sz)\n    {{\n        unsigned int rem = 0;\n        while(i < sz)\n        {{\n            rem = (rem << 8) | cdata[i++];\n        }}\n        res += rem * PRIME3;\n        res = ((res << 13) | (res >> 19)) * PRIME2;\n    }}\n    \n    res ^= res >> 16;\n    res *= PRIME4;\n    res ^= res >> 13;\n    res *= PRIME1;\n    res ^= res >> 16;\n    \n    return res;\n}}\n",
+        "imports": null,
+        "typedefs": null
+      },
+      "py": {
+        "body": "def {name}(data: bytes) -> int:\n    PRIME1 = 0x9E3779B1\n    PRIME2 = 0x85EBCA6B\n    PRIME3 = 0xC2B2AE35\n    PRIME4 = 0x27D4EB2F\n    PRIME5 = 0x165667B1\n    res = (PRIME5 + len(data)) & 0xFFFFFFFF\n    i = 0\n    \n    while i + 4 <= len(data):\n        k = int.from_bytes(data[i:i+4], byteorder='little')\n        res = (res + (k * PRIME1) & 0xFFFFFFFF) & 0xFFFFFFFF\n        res = (((res << 13) | (res >> 19)) & 0xFFFFFFFF) * PRIME2\n        res &= 0xFFFFFFFF\n        i += 4\n    \n    if i < len(data):\n        rem = 0\n        for b in data[i:]:\n            rem = (rem << 8) | b\n        res = (res + (rem * PRIME3) & 0xFFFFFFFF) & 0xFFFFFFFF\n        res = (((res << 13) | (res >> 19)) & 0xFFFFFFFF) * PRIME2\n        res &= 0xFFFFFFFF\n    \n    res ^= res >> 16\n    res = (res * PRIME4) & 0xFFFFFFFF\n    res ^= res >> 13\n    res = (res * PRIME1) & 0xFFFFFFFF\n    res ^= res >> 16\n    \n    return res & 0xFFFFFFFF\n",
+        "imports": null,
+        "typedefs": null
+      }
+    },
+    "murmur3": {
+      "c": {
+        "body": "unsigned int {name}(const void* data, unsigned int sz)\n{{\n    const unsigned char* cdata = (const unsigned char*)data;\n    const unsigned int seed = 0;\n    const unsigned int c1 = 0xcc9e2d51;\n    const unsigned int c2 = 0x1b873593;\n    const unsigned int c3 = 0xe6546b64;\n    const unsigned int c4 = 0x85ebca6b;\n    const unsigned int c5 = 0xc2b2ae35;\n    unsigned int h = seed;\n    unsigned int i = 0;\n    \n    while(i + 4 <= sz)\n    {{\n        unsigned int k = ((unsigned int)cdata[i]) | \n                        ((unsigned int)cdata[i+1] << 8) | \n                        ((unsigned int)cdata[i+2] << 16) | \n                        ((unsigned int)cdata[i+3] << 24);\n        k *= c1;\n        k = (k << 15) | (k >> 17);\n        k *= c2;\n        h ^= k;\n        h = (h << 13) | (h >> 19);\n        h = h * 5 + c3;\n        i += 4;\n    }}\n    \n    unsigned int k = 0;\n    unsigned int remaining = sz - i;\n    if(remaining >= 3)\n    {{\n        k ^= cdata[i + 2] << 16;\n    }}\n    if(remaining >= 2)\n    {{\n        k ^= cdata[i + 1] << 8;\n    }}\n    if(remaining >= 1)\n    {{\n        k ^= cdata[i];\n        k *= c1;\n        k = (k << 15) | (k >> 17);\n        k *= c2;\n        h ^= k;\n    }}\n    \n    h ^= sz;\n    h ^= h >> 16;\n    h *= c4;\n    h ^= h >> 13;\n    h *= c5;\n    h ^= h >> 16;\n    \n    return h;\n}}\n",
+        "imports": null,
+        "typedefs": null
+      },
+      "py": {
+        "body": "def {name}(data: bytes) -> int:\n    seed = 0\n    c1 = 0xcc9e2d51\n    c2 = 0x1b873593\n    c3 = 0xe6546b64\n    c4 = 0x85ebca6b\n    c5 = 0xc2b2ae35\n    h = seed\n    i = 0\n    length = len(data)\n    \n    while i + 4 <= length:\n        k = int.from_bytes(data[i:i+4], byteorder='little')\n        k = (k * c1) & 0xFFFFFFFF\n        k = ((k << 15) | (k >> 17)) & 0xFFFFFFFF\n        k = (k * c2) & 0xFFFFFFFF\n        h ^= k\n        h = ((h << 13) | (h >> 19)) & 0xFFFFFFFF\n        h = (h * 5 + c3) & 0xFFFFFFFF\n        i += 4\n    \n    k = 0\n    remaining = length - i\n    if remaining >= 3:\n        k ^= data[i + 2] << 16\n    if remaining >= 2:\n        k ^= data[i + 1] << 8\n    if remaining >= 1:\n        k ^= data[i]\n        k = (k * c1) & 0xFFFFFFFF\n        k = ((k << 15) | (k >> 17)) & 0xFFFFFFFF\n        k = (k * c2) & 0xFFFFFFFF\n        h ^= k\n    \n    h ^= length\n    h = (h ^ (h >> 16)) & 0xFFFFFFFF\n    h = (h * c4) & 0xFFFFFFFF\n    h = (h ^ (h >> 13)) & 0xFFFFFFFF\n    h = (h * c5) & 0xFFFFFFFF\n    h = (h ^ (h >> 16)) & 0xFFFFFFFF\n    \n    return h\n",
+        "imports": null,
+        "typedefs": null
+      }
+    }
+  }
+}
